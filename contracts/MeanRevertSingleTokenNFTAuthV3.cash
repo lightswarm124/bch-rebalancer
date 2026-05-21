@@ -1,207 +1,106 @@
 // contracts/MeanRevertSingleTokenNFTAuthV3.cash
+//
+// Layla-ready portfolio covenant for a single BCH + stablecoin rebalancing UTXO.
+// The contract is intentionally conservative:
+// - one portfolio input
+// - one portfolio output
+// - NFT authority on a pure CashToken NFT input
+// - exact transaction-shape checks on the portfolio successor
+//
+// The off-chain planner is expected to choose the rebalance step and enforce
+// slippage / fee caps before broadcasting.
 pragma cashscript ^0.13.0;
 
-/**
- * MeanRevertSingleTokenNFTAuthV3 – value-based mean reversion (BCH vs FT)
- *
- * Portfolio:
- *   - BCH (contract's BCH balance)
- *   - A single FT tokenCategory representing a USD stablecoin
- *
- * Oracle:
- *   - oraclePriceRaw: BCH/USD * 100 (e.g. 479.58 USD/BCH -> 47958)
- *
- * Goal:
- *   - Enforce that each rebalance moves the contract’s portfolio
- *     closer to a 1:1 value balance between:
- *
- *       BCH_value_in_USD  vs  FT_value_in_USD
- *
- *   using the invariant:
- *
- *     // These must match the off-chain math tests:
- *     //   oldBchScaled = oldBch / 10_000
- *     //   bchValueUsd  = (oldBchScaled * oraclePriceRaw) / 10_000 / 100
- *     //
- *     //   D_before = | BCH_value_usd_in - tokens_in |
- *     //   D_after  = | BCH_value_usd_out - tokens_out |
- *     //
- *     //   require(D_after <= D_before)
- *
- *   where:
- *     - B_in/B_out   are BCH satoshis on *this contract* (inputs/outputs)
- *     - T_in/T_out   are FT amounts on *this contract*’s UTXOs
- *
- * NFT authority:
- *   - At least one input must include an NFT with:
- *       tokenAmount == 0  (pure NFT)
- *       nftCommitment == rebalancerNftCommit
- *
- * Notes:
- *   - We keep `tokenCategory` and `rebalancerNftCat` as constructor params
- *     for future use, but the invariant is enforced only via:
- *       - BCH value (from this contract’s inputs/outputs), and
- *       - tokenAmount on the contract’s own input & first contract output.
- */
-
 contract MeanRevertSingleTokenNFTAuthV3(
-    // Token category for the stablecoin (32-byte category, VM-order)
-    bytes   tokenCategory,
-    int     targetTokenAmount,
-    bytes   rebalancerNftCat,
-    bytes   rebalancerNftCommit,
+    bytes tokenCategory,
+    int targetTokenAmount,
+    bytes rebalancerNftCat,
+    bytes rebalancerNftCommit,
     bytes20 ownerPkh
 ) {
-    /**
-     * Value-based rebalance.
-     *
-     * @param oraclePriceRaw BCH/USD * 100 (e.g. 200.00 -> 20000)
-     */
     function rebalance(int oraclePriceRaw) {
-        // Touch unused constructor fields so the compiler doesn’t complain.
-        require(rebalancerNftCat == rebalancerNftCat);
-        require(targetTokenAmount == targetTokenAmount);
+        // Keep constructor fields live for the compiler and document intent.
         require(tokenCategory == tokenCategory);
+        require(targetTokenAmount == targetTokenAmount);
+        require(rebalancerNftCat == rebalancerNftCat);
 
-        // Oracle price must be positive.
         require(oraclePriceRaw > 0);
 
-        // ---- NFT authority check ----
-        //
-        // Require at least one pure NFT input with the expected commitment.
         bool hasNftAuthority = false;
-        int k = 0;
-
+        int i = 0;
         do {
-            // Only pure NFTs have tokenAmount == 0.
-            if (tx.inputs[k].tokenAmount == 0) {
-                if (tx.inputs[k].nftCommitment == rebalancerNftCommit) {
+            if (tx.inputs[i].tokenAmount == 0) {
+                if (tx.inputs[i].nftCommitment == rebalancerNftCommit) {
                     hasNftAuthority = true;
                 }
             }
-
-            k = k + 1;
-        } while (k < tx.inputs.length);
-
+            i = i + 1;
+        } while (i < tx.inputs.length);
         require(hasNftAuthority);
 
-        // ---- Determine this contract's locking bytecode ----
         int contractIndex = this.activeInputIndex;
         bytes contractLock = tx.inputs[contractIndex].lockingBytecode;
 
-        // ---- Aggregate BCH for THIS contract (inputs) ----
-        //
-        // oldBch = sum of BCH satoshis from inputs locked to this contract.
-        // We allow multiple contract UTXOs in theory, but tests use just one.
-        int i = 0;
         int oldBch = 0;
-
-        do {
-            if (tx.inputs[i].lockingBytecode == contractLock) {
-                oldBch = oldBch + int(tx.inputs[i].value);
-            }
-
-            i = i + 1;
-        } while (i < tx.inputs.length);
-
-        // ---- Aggregate BCH for THIS contract (outputs) ----
-        //
-        // newBch = sum of BCH satoshis to outputs locked to this contract.
+        int oldTokens = 0;
+        int contractInputCount = 0;
         int j = 0;
-        int newBch = 0;
-
         do {
-            if (tx.outputs[j].lockingBytecode == contractLock) {
-                newBch = newBch + int(tx.outputs[j].value);
+            if (tx.inputs[j].lockingBytecode == contractLock) {
+                contractInputCount = contractInputCount + 1;
+                oldBch = oldBch + int(tx.inputs[j].value);
+                if (tx.inputs[j].tokenAmount > 0) {
+                    oldTokens = tx.inputs[j].tokenAmount;
+                }
             }
-
             j = j + 1;
-        } while (j < tx.outputs.length);
+        } while (j < tx.inputs.length);
 
-        // ---- Stablecoin tokens (simple 1-in / 1-out model) ----
-        //
-        // OLD TOKENS:
-        //   Take the tokenAmount on THIS contract’s own input.
-        int oldTokens = tx.inputs[contractIndex].tokenAmount;
+        require(contractInputCount == 1);
+        require(oldBch > 0 || oldTokens > 0);
 
-        // NEW TOKENS:
-        //   Take tokenAmount from the *first* output locked to this contract
-        //   that carries tokens (tokenAmount > 0). If none is found, we treat
-        //   newTokens = 0, allowing the contract to fully exit the stablecoin
-        //   position as long as the value-balance improves.
+        int newBch = 0;
         int newTokens = 0;
+        int contractOutputCount = 0;
         bool foundNewTokens = false;
-        int m = 0;
-
+        int k = 0;
         do {
-            if (!foundNewTokens) {
-                if (tx.outputs[m].lockingBytecode == contractLock) {
-                    int outAmount = tx.outputs[m].tokenAmount;
-                    if (outAmount > 0) {
-                        newTokens = outAmount;
+            if (tx.outputs[k].lockingBytecode == contractLock) {
+                contractOutputCount = contractOutputCount + 1;
+                newBch = newBch + int(tx.outputs[k].value);
+                if (tx.outputs[k].tokenAmount > 0) {
+                    if (!foundNewTokens) {
+                        newTokens = tx.outputs[k].tokenAmount;
                         foundNewTokens = true;
                     }
                 }
             }
+            k = k + 1;
+        } while (k < tx.outputs.length);
 
-            m = m + 1;
-        } while (m < tx.outputs.length);
-
-        // Optional sanity: portfolio should at least have something.
-        require(oldBch > 0 || oldTokens > 0);
-
-        // ---- Value-based mean reversion invariant ----
-        //
-        // We mirror the off-chain helper:
-        //   BCH_SCALE_DOWN = 10_000
-        //   PRICE_SCALE    = 100
-        //
-        //   bchScaled   = bchSats / BCH_SCALE_DOWN
-        //   bchValueUsd = (bchScaled * oraclePriceRaw)
-        //                 / BCH_SCALE_DOWN
-        //                 / PRICE_SCALE
-        //
-        //   D = | bchValueUsd - tokens |
-        //
-        // Then require D_after <= D_before.
+        require(contractOutputCount == 1);
+        require(newBch == oldBch);
 
         int BCH_SCALE_DOWN = 10000;
         int PRICE_SCALE = 100;
 
-        // BCH value in "USD-ish" units before
         int oldBchScaled = oldBch / BCH_SCALE_DOWN;
-        int oldBchUsd = (oldBchScaled * oraclePriceRaw)
-                        / BCH_SCALE_DOWN
-                        / PRICE_SCALE;
+        int oldBchUsd = (oldBchScaled * oraclePriceRaw) / BCH_SCALE_DOWN / PRICE_SCALE;
 
-        // BCH value in "USD-ish" units after
         int newBchScaled = newBch / BCH_SCALE_DOWN;
-        int newBchUsd = (newBchScaled * oraclePriceRaw)
-                        / BCH_SCALE_DOWN
-                        / PRICE_SCALE;
+        int newBchUsd = (newBchScaled * oraclePriceRaw) / BCH_SCALE_DOWN / PRICE_SCALE;
 
-        // D_before = | oldBchUsd - oldTokens |
         int beforeDelta = oldBchUsd - oldTokens;
         if (beforeDelta < 0) beforeDelta = -beforeDelta;
 
-        // D_after = | newBchUsd - newTokens |
         int afterDelta = newBchUsd - newTokens;
         if (afterDelta < 0) afterDelta = -afterDelta;
 
-        // Require that the rebalance moves the portfolio closer
-        // (or at worst equal) to 1:1 value balance.
         require(afterDelta <= beforeDelta);
     }
 
-    /**
-     * Drain (owner P2PKH)
-     *
-     * Escape hatch: owner can always fully empty the contract,
-     * regardless of NFTs or oracle prices.
-     */
     function drain(pubkey ownerPk, sig ownerSig) {
         require(hash160(ownerPk) == ownerPkh);
         require(checkSig(ownerSig, ownerPk));
-        // No additional constraints: all BCH + tokens may be spent freely.
     }
 }

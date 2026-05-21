@@ -12,6 +12,14 @@
 export const NETWORK = "chipnet";
 
 //
+// Project metadata
+//
+export const PROJECT_NAME = "BCH Rebalancer";
+export const PROJECT_TAGLINE =
+  "Chipnet mean-reversion rebalancer with a TUI-first workflow";
+export const DEFAULT_TIMEZONE = "America/Toronto";
+
+//
 // SumInputs constructor argument
 //  - minTotalSats is the minimum total of *all* input values required
 //    by the covenant (sum of tx.inputs[i].value).
@@ -70,6 +78,10 @@ export const SPEND_SPLIT_OUTPUTS = 4;
 export const FT_CATEGORY_HEX =
   "72841fa040aeeaeb4b3b08a7b74794cfddd97e3eac519c5290de44b5a297624c";
 
+// Live Cauldron chipnet-16 token for TUI + testing.
+export const CAULDRON_TOKEN_CATEGORY_HEX =
+  "dfe50223c8d5cba8dcef8dff6d92b61deb88a8ba44947367f2b746487b56039b";
+
 export const NFT_CATEGORY_HEX =
   "06165b5aecd9b02a29bb12b08446d4ed01e7bde60035287ebb12fd4b6d2c2553";
 
@@ -78,3 +90,59 @@ export const REBALANCER_NFT_COMMITMENT_HEX = "6e667430"; // "nft0"
 export const TARGET_TOKENS = 1000n;
 
 export const INITIAL_TOKENS_ON_CONTRACT = 800n;
+
+// ---------------------------------------------------------------------------
+// Standalone project configuration
+// ---------------------------------------------------------------------------
+
+// TUI refresh cadence.
+export const TUI_REFRESH_MS = 3_000;
+
+export const INDEXER_BASE_URL =
+  process.env.INDEXER_BASE_URL ??
+  process.env.VITE_INDEXER_BASE_URL ??
+  "https://indexer-chipnet.riften.net";
+
+// Default DEX settings for the new standalone adapter layer.
+export const CAULDRON_API_BASE_URL =
+  process.env.CAULDRON_API_BASE_URL ??
+  process.env.VITE_CAULDRON_API_BASE_URL ??
+  process.env.CAULDRON_CHIPNET_API_BASE_URL ??
+  process.env.VITE_CAULDRON_CHIPNET_API_BASE_URL ??
+  "https://indexer-chipnet.riften.net/cauldron";
+
+export const CAULDRON_MODE = process.env.CAULDRON_MODE ?? 'live';
+export const MOCK_ORACLE_PRICE_RAW = BigInt(process.env.MOCK_ORACLE_PRICE_RAW ?? 10_000);
+
+export const CAULDRON_POOL_ID = process.env.CAULDRON_POOL_ID ?? "";
+export const CAULDRON_TOKEN_ID =
+  process.env.CAULDRON_TOKEN_ID ?? CAULDRON_TOKEN_CATEGORY_HEX;
+export const CAULDRON_PUBLIC_KEY_HASH = process.env.CAULDRON_PUBLIC_KEY_HASH ?? "";
+export const STABLECOIN_CATEGORY_HEX =
+  process.env.STABLECOIN_CATEGORY_HEX ?? CAULDRON_TOKEN_ID;
+
+// Strategy guardrails.
+export const MAX_SLIPPAGE_BPS = Number(process.env.MAX_SLIPPAGE_BPS ?? 150);
+export const MAX_TRADE_BPS = Number(process.env.MAX_TRADE_BPS ?? 5_000);
+export const MIN_TRADE_SATS = BigInt(process.env.MIN_TRADE_SATS ?? 10_000);
+
+// Chipnet addresses. These can be replaced by env vars for local testing.
+export const CONTRACT_ADDRESS =
+  process.env.CONTRACT_ADDRESS ??
+  "bchtest:pdu88tqjn0y0y9z7jrl6m6rfnzry3ama4smzmspc6vw6vw0hucudgctt37elv";
+
+export const CONTRACT_TOKEN_ADDRESS =
+  process.env.CONTRACT_TOKEN_ADDRESS ??
+  "bchtest:rdu88tqjn0y0y9z7jrl6m6rfnzry3ama4smzmspc6vw6vw0hucudg2chs8cx8";
+
+export const ALICE_ADDRESS =
+  process.env.ALICE_ADDRESS ??
+  "bchtest:qqqsg7fpq3c4xz3pgc6algdm8tjst4x5jy9f4vyfw";
+
+export const ALICE_TOKEN_ADDRESS =
+  process.env.ALICE_TOKEN_ADDRESS ??
+  "bchtest:zqqsg7fpq3c4xz3pgc6algdm8tjst4x5jy0rptz0ma";
+
+// Live BCH/USD oracle settings.
+export const ORACLE_PUBLIC_KEY_HEX =
+  process.env.ORACLE_PUBLIC_KEY_HEX ?? "";

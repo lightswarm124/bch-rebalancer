@@ -1,25 +1,26 @@
 {
-  "dependencies": {
-    "@bitauth/libauth": "^3.1.0-next.8",
-    "cashc": "^0.13.0-next.1",
-    "cashscript": "^0.13.0-next.1"
-  },
-  "name": "loops",
+  "name": "bch-rebalancer",
   "version": "1.0.0",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "mint-all": "node index.js mint-all",
-    "burn-tokens": "node index.js burn-tokens",
-    "mean-fund": "node index.js mean-fund",
-    "mean-rebalance": "node index.js mean-rebalance",
-    "mean-roundtrip": "node index.js mean-roundtrip",
-    "mean-drain": "node index.js mean-drain",
-    "status": "node index.js status",
-    "test": "node --test tests/*.test.js"
-  },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js tui",
+    "tui": "node index.js tui",
+    "mock:tui": "CAULDRON_MODE=mock node index.js tui",
+    "mock:plan": "CAULDRON_MODE=mock node index.js plan",
+    "plan": "node index.js plan",
+    "status": "node index.js status",
+    "research:quantumroot": "node index.js research quantumroot",
+    "contract:compile": "node index.js compile-contract",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@bitauth/libauth": "^3.1.0-next.8",
+    "cashc": "^0.13.0-next.3",
+    "cashscript": "^0.13.0-next.3"
+  }
 }

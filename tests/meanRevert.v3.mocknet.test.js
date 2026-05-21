@@ -445,7 +445,7 @@ test("MeanRevertV3: ignores non-stablecoin token categories in value math", asyn
   //   - 100 stable tokens = $100
   //
   // Alice holds 200 units of a *different* FT category (FOREIGN_FT_CATEGORY_VM),
-  // which will be deposited onto the contract in the rebalance.
+  // which will move only through the treasury side of the transaction.
   const initialStableTokens = 100n;
   const extraForeignTokensFromAlice = 200n;
 
@@ -470,12 +470,11 @@ test("MeanRevertV3: ignores non-stablecoin token categories in value math", asyn
   const oldTokens = initialStableTokens; // Only stablecoin category
 
   // New portfolio on contract:
-  //   - BCH: effectively unchanged in value terms (extra 1000 sats truncates away)
+  //   - BCH: unchanged
   //   - Stablecoin: still 100 tokens (still $100)
-  //   - PLUS 200 foreign FT tokens (ignored by the value invariant)
-  // Keep the *total* BCH for this contract exactly the same before and after.
-  // We just split it across two outputs: one for stable, one for foreign.
-  const newBch = oldBch + TOKEN_OUTPUT_SATS; // 100_000_000 + 1_000; bchValueUsd stays 100
+  //   - PLUS 200 foreign FT tokens on the treasury side, which the covenant
+  //     must ignore.
+  const newBch = oldBch;
   const newStableTokens = initialStableTokens; // still 100
 
   const before = imbalance(oldBch, oldTokens, ORACLE_PRICE_RAW);
@@ -502,15 +501,14 @@ test("MeanRevertV3: ignores non-stablecoin token categories in value math", asyn
 
   const feeEstimate = 1_000n;
 
-  const contractForeignOutputSats = TOKEN_OUTPUT_SATS; // sats carrying foreign FTs
-  const contractStableOutputSats =
-    contractFtUtxo.satoshis - contractForeignOutputSats; // 100_000_000 - 1_000
+  const contractStableOutputSats = contractFtUtxo.satoshis;
+  const foreignOutputSats = TOKEN_OUTPUT_SATS;
   const nftOutputSats = TOKEN_OUTPUT_SATS;
 
   const aliceChangeSats =
     totalInputSats -
     contractStableOutputSats -
-    contractForeignOutputSats -
+    foreignOutputSats -
     nftOutputSats -
     feeEstimate;
 
@@ -540,11 +538,10 @@ test("MeanRevertV3: ignores non-stablecoin token categories in value math", asyn
       },
     })
 
-    // Foreign FTs deposited onto the contract in a *different* category.
-    // These MUST be ignored by the value-balance invariant.
+    // Foreign FTs stay on the treasury side and must not affect the contract invariant.
     .addOutput({
-      to: contract.tokenAddress,
-      amount: contractForeignOutputSats,
+      to: aliceTokenAddress,
+      amount: foreignOutputSats,
       token: {
         category: FOREIGN_FT_CATEGORY_VM,
         amount: extraForeignTokensFromAlice,

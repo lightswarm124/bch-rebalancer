@@ -1,92 +1,103 @@
-// index.js
-//
-// Root CLI orchestrator for the loops demo.
-//
-// Commands (node index.js <cmd>):
-//   mint-all       → Mint FT + NFT (atomic) to aliceTokenAddress
-//   burn-tokens    → Burn ALL tokens from aliceTokenAddress
-//   mean-fund      → Send FT from Alice → MeanRevert contract
-//   mean-rebalance → NFT-authorised rebalance()
-//   mean-roundtrip → fund + rebalance in one go
-//   mean-drain     → Drain ALL contract funds back to Alice
-//   status         → Print UTXO summaries for Alice P2PKH + token address
-//
-// Live scripts use ElectrumNetworkProvider on NETWORK (see config.js).
-// Tests (under ./tests) use MockNetworkProvider (local mocknet).
-
-import { ElectrumNetworkProvider } from "cashscript";
-
-import { runMintAllForAlice } from "./scripts/mintAllForAlice.js";
-import { runBurnAllTokensFromAlice } from "./scripts/burnAllTokensFromAlice.js";
+import { compileMeanRevertContract } from './src/contract/compile.js';
 import {
-  runMeanRevertFund,
-  runMeanRevertRebalance,
-  runMeanRevertRoundtrip,
-  runMeanRevertDrainAll,
-} from "./scripts/meanRevert.js";
+  loadSnapshot,
+  printPortfolioPlanOnce,
+  runTui,
+} from './src/tui/app.js';
+import { renderQuantumrootSpikeReport } from './src/vaulting/quantumrootSpike.js';
+import {
+  PROJECT_NAME,
+  PROJECT_TAGLINE,
+  NETWORK,
+} from './config.js';
 
-import { aliceAddress, aliceTokenAddress } from "./common.js";
-import { NETWORK } from "./config.js";
-import { logAddressState } from "./utxos.js";
-
-async function showStatus() {
-  console.log("=========================================");
-  console.log("  ADDRESS STATUS (live network)");
-  console.log("=========================================\n");
-  console.log(`[network] Using NETWORK="${NETWORK}"\n`);
-
-  const provider = new ElectrumNetworkProvider(NETWORK);
-
-  await logAddressState("Alice (main P2PKH)", provider, aliceAddress);
-  await logAddressState(
-    "Alice (token P2PKH+tokens)",
-    provider,
-    aliceTokenAddress
-  );
+function usage() {
+  console.log(`${PROJECT_NAME}`);
+  console.log(PROJECT_TAGLINE);
+  console.log('');
+  console.log('Usage: node index.js <command>');
+  console.log('');
+  console.log('Commands:');
+  console.log('  tui                start the terminal UI');
+  console.log('  plan               print the current portfolio rebalance plan');
+  console.log('  status             print the current live indexer snapshot');
+  console.log('  compile-contract   compile the covenant artifact');
+  console.log('  research quantumroot');
+  console.log('');
+  console.log(`Network: ${NETWORK}`);
 }
 
-async function main() {
-  const cmd = process.argv[2] ?? "help";
-
-  if (cmd === "mint-all") {
-    console.log("[index] Running: runMintAllForAlice");
-    await runMintAllForAlice();
-  } else if (cmd === "burn-tokens") {
-    console.log("[index] Running: runBurnAllTokensFromAlice");
-    await runBurnAllTokensFromAlice();
-  } else if (cmd === "mean-fund") {
-    console.log("[index] Running: runMeanRevertFund (FT Alice → contract)");
-    await runMeanRevertFund();
-  } else if (cmd === "mean-rebalance") {
-    console.log("[index] Running: runMeanRevertRebalance (NFT-authorised)");
-    await runMeanRevertRebalance();
-  } else if (cmd === "mean-roundtrip") {
+async function runStatus() {
+  const snapshot = await loadSnapshot();
+  console.log(`${PROJECT_NAME} status`);
+  console.log('');
+  console.log(`Indexer health: ${snapshot.indexerHealth?.ok ? 'ok' : 'degraded'}`);
+  console.log(
+    `Chain tip: ${snapshot.indexerHealth?.payload?.chain_tip ?? 'n/a'} | indexed: ${
+      snapshot.indexerHealth?.payload?.indexed_height ?? 'n/a'
+    } | version: ${snapshot.indexerHealth?.payload?.version ?? 'n/a'}`
+  );
+  console.log(`Oracle source: ${snapshot.oracle?.source ?? 'unknown'}`);
+  console.log(`Oracle price: ${snapshot.oracle?.priceValue ?? 'n/a'}`);
+  console.log(
+    `Token: ${snapshot.market?.tokenRow?.display_name ?? 'n/a'} (${snapshot.market?.tokenRow?.display_symbol ?? 'n/a'})`
+  );
+  console.log(
+    `Price: ${snapshot.market?.tokenRow?.price_now_usd ?? snapshot.market?.priceNowUsd ?? 'n/a'} USD | APY 30d: ${
+      snapshot.market?.tokenRow?.apy_30d_bp ?? 'n/a'
+    } bp`
+  );
+  console.log(`Cauldron pools: ${Array.isArray(snapshot.market?.pools) ? snapshot.market.pools.length : 0}`);
+  console.log('');
+  console.log('Top pools');
+  for (const pool of Array.isArray(snapshot.market?.pools)
+    ? snapshot.market.pools.slice(0, 3)
+    : []) {
     console.log(
-      "[index] Running: runMeanRevertRoundtrip (fund + NFT-authorised rebalance)"
+      `  ${pool.pool_id ?? 'n/a'} | ${String(pool.sats ?? pool.tvl_sats ?? 0)} sats | ${String(pool.tokens ?? pool.tvl_tokens ?? 0)} tokens | owner ${String(pool.owner_p2pkh_addr ?? 'n/a')}`
     );
-    await runMeanRevertRoundtrip();
-  } else if (cmd === "mean-drain") {
-    console.log(
-      "[index] Running: runMeanRevertDrainAll (drain contract → Alice)"
-    );
-    await runMeanRevertDrainAll();
-  } else if (cmd === "status") {
-    console.log("[index] Running: status");
-    await showStatus();
-  } else {
-    console.log("Usage: node index.js <command>\n");
-    console.log("Commands:");
-    console.log("  mint-all       → mint FT + NFT (atomic) to Alice");
-    console.log("  burn-tokens    → burn ALL tokens from aliceTokenAddress");
-    console.log("  mean-fund      → FT Alice → MeanRevert contract");
-    console.log("  mean-rebalance → NFT-authorised rebalance()");
-    console.log("  mean-roundtrip → fund + rebalance in one go");
-    console.log("  mean-drain     → drain ALL contract funds back to Alice");
-    console.log("  status         → show Alice UTXO summaries\n");
   }
 }
 
-main().catch((err) => {
-  console.error("Error in index.js:", err);
+async function main() {
+  const [cmd, subcmd] = process.argv.slice(2);
+
+  if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
+    usage();
+    return;
+  }
+
+  if (cmd === 'tui') {
+    await runTui();
+    return;
+  }
+
+  if (cmd === 'plan') {
+    await printPortfolioPlanOnce();
+    return;
+  }
+
+  if (cmd === 'status') {
+    await runStatus();
+    return;
+  }
+
+  if (cmd === 'compile-contract') {
+    const artifact = compileMeanRevertContract();
+    console.log('Compiled artifact written to artifacts/MeanRevertSingleTokenNFTAuthV3.json');
+    console.log(`Contract bytecode length: ${artifact.bytecode.length}`);
+    return;
+  }
+
+  if (cmd === 'research' && subcmd === 'quantumroot') {
+    console.log(renderQuantumrootSpikeReport());
+    return;
+  }
+
+  usage();
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.stack || error.message : error);
   process.exit(1);
 });

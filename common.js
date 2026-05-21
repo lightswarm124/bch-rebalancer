@@ -6,14 +6,46 @@ import {
   encodeCashAddress,
   deriveSeedFromBip39Mnemonic,
 } from "@bitauth/libauth";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const commonDir = dirname(fileURLToPath(import.meta.url));
+
+function loadEnvFile(path = resolve(commonDir, ".env")) {
+  if (!existsSync(path)) return;
+  const content = readFileSync(path, "utf8");
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!key || process.env[key]) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadEnvFile();
 
 // This is duplicated from common.ts because it is not possible to import from a .ts file in p2pkh.js
 
-// Generate entropy from BIP39 mnemonic phrase and initialise a root HD-wallet node
-const seed = deriveSeedFromBip39Mnemonic(
-  // "twelve word mnemonic seed phrase backup example only not secure nor valid"
-  "talk story visual hidden behind wasp evil abandon bus brand circle sketch"
-);
+const mnemonic = process.env.BIP39_MNEMONIC;
+if (!mnemonic) {
+  throw new Error(
+    "Missing BIP39_MNEMONIC. Put the seed phrase in .env (ignored by git) before running wallet scripts."
+  );
+}
+
+// Generate entropy from the BIP39 mnemonic phrase and initialise a root HD-wallet node.
+const seed = deriveSeedFromBip39Mnemonic(mnemonic);
 const rootNode = deriveHdPrivateNodeFromSeed(seed, {
   assumeValidity: true,
   throwErrors: true,
