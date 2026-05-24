@@ -4,6 +4,17 @@
 // NOTE: This file is intentionally minimal – all other scripts should
 // import from here instead of hardcoding these values.
 
+import { aliceAddress as DEFAULT_ALICE_ADDRESS, aliceTokenAddress as DEFAULT_ALICE_TOKEN_ADDRESS } from './common.js';
+import { GP_BCH_USD_ORACLE_PUBKEY } from './oracles/oraclesClient.js';
+
+function parseBooleanEnv(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 //
 // Network config
 //  - "chipnet" for BCH chipnet (test network for CHIPs/loops)
@@ -96,7 +107,12 @@ export const INITIAL_TOKENS_ON_CONTRACT = 800n;
 // ---------------------------------------------------------------------------
 
 // TUI refresh cadence.
-export const TUI_REFRESH_MS = 3_000;
+// Set to 0 for manual refresh only. Use `r` in the TUI to refresh.
+export const TUI_REFRESH_MS = Number(process.env.TUI_REFRESH_MS ?? 0);
+export const DAEMON_POLL_MS = Number(process.env.DAEMON_POLL_MS ?? 15_000);
+export const DAEMON_BACKOFF_MS = Number(process.env.DAEMON_BACKOFF_MS ?? 5_000);
+export const DAEMON_MAX_BACKOFF_MS = Number(process.env.DAEMON_MAX_BACKOFF_MS ?? 300_000);
+export const DAEMON_AUTO_BROADCAST = parseBooleanEnv(process.env.DAEMON_AUTO_BROADCAST, false);
 
 export const INDEXER_BASE_URL =
   process.env.INDEXER_BASE_URL ??
@@ -125,6 +141,21 @@ export const STABLECOIN_CATEGORY_HEX =
 export const MAX_SLIPPAGE_BPS = Number(process.env.MAX_SLIPPAGE_BPS ?? 150);
 export const MAX_TRADE_BPS = Number(process.env.MAX_TRADE_BPS ?? 5_000);
 export const MIN_TRADE_SATS = BigInt(process.env.MIN_TRADE_SATS ?? 10_000);
+export const MIN_NET_BENEFIT_CENTS = BigInt(process.env.MIN_NET_BENEFIT_CENTS ?? 25);
+export const ESTIMATED_TRADE_FEE_SATS = BigInt(process.env.ESTIMATED_TRADE_FEE_SATS ?? 2500);
+export const BROADCAST_ENABLED =
+  String(process.env.BROADCAST_ENABLED ?? process.env.ENABLE_LIVE_BROADCAST ?? '0')
+    .toLowerCase()
+    .trim() === '1' ||
+  String(process.env.BROADCAST_ENABLED ?? process.env.ENABLE_LIVE_BROADCAST ?? '')
+    .toLowerCase()
+    .trim() === 'true';
+export const BROADCAST_TEST_MAX_TRADE_TOKENS = BigInt(
+  process.env.BROADCAST_TEST_MAX_TRADE_TOKENS ?? 100
+);
+export const BROADCAST_FEE_RATE_SATS_PER_BYTE = Number(
+  process.env.BROADCAST_FEE_RATE_SATS_PER_BYTE ?? SATS_PER_BYTE
+);
 
 // Chipnet addresses. These can be replaced by env vars for local testing.
 export const CONTRACT_ADDRESS =
@@ -137,12 +168,12 @@ export const CONTRACT_TOKEN_ADDRESS =
 
 export const ALICE_ADDRESS =
   process.env.ALICE_ADDRESS ??
-  "bchtest:qqqsg7fpq3c4xz3pgc6algdm8tjst4x5jy9f4vyfw";
+  DEFAULT_ALICE_ADDRESS;
 
 export const ALICE_TOKEN_ADDRESS =
   process.env.ALICE_TOKEN_ADDRESS ??
-  "bchtest:zqqsg7fpq3c4xz3pgc6algdm8tjst4x5jy0rptz0ma";
+  DEFAULT_ALICE_TOKEN_ADDRESS;
 
 // Live BCH/USD oracle settings.
 export const ORACLE_PUBLIC_KEY_HEX =
-  process.env.ORACLE_PUBLIC_KEY_HEX ?? "";
+  process.env.ORACLE_PUBLIC_KEY_HEX ?? GP_BCH_USD_ORACLE_PUBKEY;

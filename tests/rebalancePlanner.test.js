@@ -10,7 +10,7 @@ import {
 test('chooseRebalanceStep holds when the portfolio is already balanced', () => {
   const plan = chooseRebalanceStep({
     bchSats: 100_000_000n,
-    stablecoinTokens: 100n,
+    stablecoinTokens: 10_000n,
     oraclePriceRaw: 10_000n,
   });
 
@@ -23,7 +23,7 @@ test('chooseRebalanceStep holds when the portfolio is already balanced', () => {
 test('chooseRebalanceStep sells stablecoin when the portfolio is overweight stablecoin', () => {
   const plan = chooseRebalanceStep({
     bchSats: 100_000_000n,
-    stablecoinTokens: 200n,
+    stablecoinTokens: 20_000n,
     oraclePriceRaw: 10_000n,
   });
 
@@ -35,12 +35,12 @@ test('chooseRebalanceStep sells stablecoin when the portfolio is overweight stab
 test('portfolioImbalance increases when a rebalance moves away from the target', () => {
   const before = portfolioImbalance({
     bchSats: 100_000_000n,
-    stablecoinTokens: 110n,
+    stablecoinTokens: 10_000n,
     oraclePriceRaw: 10_000n,
   });
   const after = portfolioImbalance({
     bchSats: 100_000_000n,
-    stablecoinTokens: 200n,
+    stablecoinTokens: 20_000n,
     oraclePriceRaw: 10_000n,
   });
 
@@ -54,9 +54,9 @@ test('buildPortfolioRebalanceSnapshot includes target weights and formatted guid
     oraclePriceRaw: 10_000n,
   });
 
-  assert.equal(summary.totalUsd, 250n);
-  assert.equal(summary.targetUsd, 125n);
-  assert.equal(summary.bchWeightBps, 4000n);
-  assert.equal(summary.stableWeightBps, 6000n);
+  assert.equal(summary.totalUsd, 10_150n);
+  assert.equal(summary.targetUsd, 5_075n);
+  assert.equal(summary.bchWeightBps, 9852n);
+  assert.equal(summary.stableWeightBps, 147n);
   assert.match(summary.formatted.headline, /Sell stablecoin|Buy stablecoin|No rebalance/);
 });

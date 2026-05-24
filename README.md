@@ -33,9 +33,12 @@ internal tests and fixture validation only.
 npm install
 npm run tui
 npm run plan
+npm run preflight
+npm run dryrun
 npm run status
 npm run compile-contract
 npm run research:quantumroot
+npm run wallet:rotate
 npm run mock:tui
 npm run mock:plan
 ```
@@ -44,7 +47,7 @@ npm run mock:plan
 
 The repo runs with chipnet defaults, but these can be overridden:
 
-- `ORACLE_PUBLIC_KEY_HEX`
+- `ORACLE_PUBLIC_KEY_HEX` defaulting to the public GP BCH/USD oracle key used by the live preflight
 - `INDEXER_BASE_URL`
 - `CAULDRON_API_BASE_URL`
 - `CAULDRON_CHIPNET_API_BASE_URL`
@@ -58,9 +61,40 @@ The repo runs with chipnet defaults, but these can be overridden:
 - `BIP39_MNEMONIC` for the legacy wallet helper scripts in `common.js`
 - `CAULDRON_MODE` (`live` or `mock`)
 - `MOCK_ORACLE_PRICE_RAW`
+- `WALLET_DERIVATION_PATH` defaulting to `m/44'/1'/0'/0/0`
+- `WALLET_ADDRESS_SCAN_LIMIT` defaulting to `1`
+- `WALLET_ELECTRUM_SERVERS` defaulting to the chipnet electrum pool used by CashScript:
+  - `chipnet.bch.ninja`
+  - `chipnet.imaginary.cash`
+  - `electrum-chipnet.optnlabs.com`
+- `BIP39_PASSPHRASE` if the chipnet wallet seed uses a passphrase
+- `BROADCAST_ENABLED` or `ENABLE_LIVE_BROADCAST` to allow a live chipnet send
+- `BROADCAST_TEST_MAX_TRADE_TOKENS` to cap the live trade size for test isolation
+- `BROADCAST_FEE_RATE_SATS_PER_BYTE` to control the live transaction fee rate
+- `NEW_BIP39_MNEMONIC` to force a specific destination seed when rotating wallets
+- `NEW_BIP39_PASSPHRASE` if the new seed also uses a passphrase
+- `ROTATE_WALLET_BROADCAST=0` to preview the wallet rotation without sending it
+
+`npm run preflight` validates the live wallet, the selected Cauldron pool, the
+swap quote against pool reserves, and reports the remaining broadcast blocker.
+
+`npm run dryrun` builds a non-broadcast Cauldron transaction manifest from the
+live wallet, pool selection, and oracle snapshot. It shows selected inputs,
+planned outputs, and the transaction shape that would be signed later.
+
+`npm run broadcast` builds and broadcasts a capped live chipnet trade. It is
+disabled by default; set `BROADCAST_ENABLED=1` in `.env` when you are ready to
+let the command submit a transaction.
+
+`npm run wallet:rotate` generates a fresh chipnet wallet seed, migrates the
+current wallet's ParyonUSD holdings into the new token address, seeds the new
+wallet with about `0.04 BCH`, and writes the new mnemonic into `.env` after a
+successful broadcast. Set `ROTATE_WALLET_BROADCAST=0` first if you want to
+preview the plan before the on-chain transfer.
 
 Copy `.env.example` to `.env` and fill in the mnemonic locally. The real `.env`
-file is ignored by git.
+file is ignored by git. If your funded wallet uses a BIP39 passphrase, set
+`BIP39_PASSPHRASE` too.
 
 ## Mocknet Structure
 
